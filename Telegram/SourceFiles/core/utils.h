@@ -92,31 +92,6 @@ using set_of_unique_ptr = std::set<std::unique_ptr<T>, base::pointer_comparator<
 template <typename T>
 using set_of_shared_ptr = std::set<std::shared_ptr<T>, base::pointer_comparator<T>>;
 
-using byte_span = gsl::span<gsl::byte>;
-using const_byte_span = gsl::span<const gsl::byte>;
-using byte_vector = std::vector<gsl::byte>;
-template <size_t N>
-using byte_array = std::array<gsl::byte, N>;
-
-inline void copy_bytes(byte_span destination, const_byte_span source) {
-	Expects(destination.size() >= source.size());
-	memcpy(destination.data(), source.data(), source.size());
-}
-
-inline void move_bytes(byte_span destination, const_byte_span source) {
-	Expects(destination.size() >= source.size());
-	memmove(destination.data(), source.data(), source.size());
-}
-
-inline void set_bytes(byte_span destination, gsl::byte value) {
-	memset(destination.data(), gsl::to_integer<unsigned char>(value), destination.size());
-}
-
-inline int compare_bytes(const_byte_span a, const_byte_span b) {
-	auto aSize = a.size(), bSize = b.size();
-	return (aSize > bSize) ? 1 : (aSize < bSize) ? -1 : memcmp(a.data(), b.data(), aSize);
-}
-
 // Thanks https://stackoverflow.com/a/28139075
 
 template <typename Container>
@@ -420,18 +395,35 @@ enum DBIWorkMode {
 	dbiwmWindowOnly = 2,
 };
 
-enum DBIConnectionType {
-	dbictAuto = 0,
-	dbictHttpAuto = 1, // not used
-	dbictHttpProxy = 2,
-	dbictTcpProxy = 3,
-};
-
 struct ProxyData {
+	enum class Type {
+		None,
+		Socks5,
+		Http,
+		Mtproto,
+	};
+
+	Type type = Type::None;
 	QString host;
 	uint32 port = 0;
 	QString user, password;
+
+	std::vector<QString> resolvedIPs;
+	TimeMs resolvedExpireAt = 0;
+
+	bool valid() const;
+	bool supportsCalls() const;
+	bool tryCustomResolve() const;
+	explicit operator bool() const;
+	bool operator==(const ProxyData &other) const;
+	bool operator!=(const ProxyData &other) const;
+
+	static bool ValidSecret(const QString &secret);
+
 };
+
+ProxyData ToDirectIpProxy(const ProxyData &proxy, int ipIndex = 0);
+QNetworkProxy ToNetworkProxy(const ProxyData &proxy);
 
 enum DBIScale {
 	dbisAuto = 0,
